@@ -47,3 +47,5 @@ Download any Text Object of SAP System into Excel File directly.
 ## Project 5: Dynamic Input-Output Convertion
 
 Dynamically convert a DDIC value to Input/Output format.
+
+## Project 6: Dynamic Split of Table into Smaller Ones
