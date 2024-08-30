@@ -48,3 +48,6 @@ Download any Text Object of SAP System into Excel File directly.
 Dynamically convert a DDIC value to Input/Output format.
 
 ## Project 6: Dynamic Split of Table into Smaller Ones
+
+Split Internal Table into Smaller ones specifying split segments.
+Especially useful for parallel processing tasks.
