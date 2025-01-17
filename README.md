@@ -2,6 +2,9 @@
 
 *Repository for Projects based on ABAP Programming language.*
 
+## License
+This project is licensed under the MIT License. See the LICENSE file for details.
+
 ## Motivation for Creating the Repository
 
 The motivation for creating the current repository was my desire to share my knowledge and progress in ABAP.
