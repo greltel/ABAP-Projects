@@ -4,9 +4,9 @@
 
 ## Motivation for Creating the Repository
 
-The motivation for creating the current repository was our desire to share our knowledge and progress in ABAP.
-We would be very happy if through this initiative, we could help ABAPers to develop their skills and increase their productivity.
-We strongly believe that because the number of ABAP Developers is limited, our libraries and code foundings must be shared. 
+The motivation for creating the current repository was my desire to share my knowledge and progress in ABAP.
+I would be very happy if through this initiative, I could help ABAPers to develop their skills and increase their productivity.
+I strongly believe that because the number of ABAP Developers is limited, our libraries and code foundings must be shared. 
 Any suggestions are always welcome regarding code optimization, addition of new functions or even ideas for projects.
 
 ## Contributors-Developers
