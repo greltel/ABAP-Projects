@@ -2,7 +2,7 @@
 *   Program name: Z_SPLIT_TABLE
 *   Description : Dynamic Split of Table into Smaller Ones
 *
-*   Created   by: GDRAKOS DVALOUXIS
+*   Created   by: GDRAKOS
 *
 ************************************************************************
 REPORT z_split_table.
