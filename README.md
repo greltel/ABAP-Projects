@@ -11,8 +11,7 @@ Any suggestions are always welcome regarding code optimization, addition of new 
 
 ## Contributors-Developers
 
-The repository was created by George Drakos and Dimitris Valouxis. We are both ABAP developers 
-seeking to learn and develop our skills in ABAP and SAP area in general. 
+The repository was created by George Drakos.
 
 ## Design Goals
 
