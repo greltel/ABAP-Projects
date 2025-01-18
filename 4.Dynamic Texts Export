@@ -7,10 +7,15 @@
 ************************************************************************
 REPORT z_dynamic_texts_export.
 
-TABLES:stxh.
+*&---------------------------------------------------------------------*
+*& GLOBAL DATA DEFINITION
+*&---------------------------------------------------------------------*
+TABLES:stxh,sscrfields.
 
-CLASS: lcx_texts DEFINITION DEFERRED,
-       lcl_texts DEFINITION DEFERRED.
+CLASS: lcx_texts      DEFINITION DEFERRED,
+       lcl_texts      DEFINITION DEFERRED,
+       lcl_utilities  DEFINITION DEFERRED,
+       lcl_sel_screen DEFINITION DEFERRED.
 
 *&---------------------------------------------------------------------*
 *& Class LCX_TEXTS DEFINITION
@@ -25,7 +30,7 @@ CLASS lcx_texts DEFINITION INHERITING FROM cx_static_check.
 
   PRIVATE SECTION.
 
-    DATA: local_text TYPE string.
+    DATA local_text TYPE string.
 
 ENDCLASS.
 
@@ -70,12 +75,42 @@ CLASS lcl_texts DEFINITION CREATE PUBLIC.
 ENDCLASS.
 
 *&---------------------------------------------------------------------*
+*& Class LCL_UTILITIES DEFINITION
+*&---------------------------------------------------------------------*
+CLASS lcl_utilities DEFINITION.
+
+  PUBLIC SECTION.
+
+    CLASS-METHODS get_export_filepath CHANGING ch_filepath TYPE file_table-filename.
+
+ENDCLASS.
+
+*----------------------------------------------------------------------*
+* CLASS lcl_sel_screen DEFINITION
+*----------------------------------------------------------------------*
+CLASS lcl_sel_screen DEFINITION FINAL CREATE PRIVATE.
+
+  PUBLIC SECTION.
+
+    CLASS-METHODS get_instance RETURNING VALUE(re_instance) TYPE REF TO lcl_sel_screen.
+
+    METHODS:
+      screen_initialization,
+      screen_pbo,
+      screen_pai IMPORTING im_system_command TYPE syst-ucomm.
+
+  PRIVATE SECTION.
+
+    CLASS-DATA lo_instance TYPE REF TO lcl_sel_screen.
+
+ENDCLASS.
+
+*&---------------------------------------------------------------------*
 *& SELECTION SCREEN DESIGN
 *&---------------------------------------------------------------------*
-
-SELECTION-SCREEN: BEGIN OF BLOCK b0 WITH FRAME TITLE title0.
-  PARAMETERS : p_file TYPE file_table-filename OBLIGATORY.
-SELECTION-SCREEN: END OF BLOCK b0.
+SELECTION-SCREEN BEGIN OF BLOCK b0 WITH FRAME TITLE title0.
+  PARAMETERS p_file TYPE file_table-filename OBLIGATORY.
+SELECTION-SCREEN END OF BLOCK b0.
 
 SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE title1.
 
@@ -85,7 +120,7 @@ SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE title1.
                   s_spras  FOR stxh-tdspras  OBLIGATORY DEFAULT syst-langu.
 
   SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE title2.
-    PARAMETERS:c_header AS CHECKBOX DEFAULT abap_true.
+    PARAMETERS c_header AS CHECKBOX DEFAULT abap_true.
   SELECTION-SCREEN END OF BLOCK b2.
 
 SELECTION-SCREEN END OF BLOCK b1.
@@ -94,13 +129,25 @@ SELECTION-SCREEN END OF BLOCK b1.
 *& INITIALIZATION OF SELECTION SCREEN ELEMENTS
 *&---------------------------------------------------------------------*
 INITIALIZATION.
-  PERFORM screen_initialization.
+  lcl_sel_screen=>get_instance( )->screen_initialization( ).
+
+*&---------------------------------------------------------------------*
+*& AT SELECTION SCREEN MODIFICATION (PBO)
+*&---------------------------------------------------------------------*
+AT SELECTION-SCREEN OUTPUT.
+  lcl_sel_screen=>get_instance( )->screen_pbo( ).
 
 *&---------------------------------------------------------------------*
 *& AT SELECTION SCREEN ON VALUE REQUESTS (F4)
 *&---------------------------------------------------------------------*
 AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
-  PERFORM get_export_filepath CHANGING p_file.
+  lcl_utilities=>get_export_filepath( CHANGING ch_filepath = p_file ).
+
+*&---------------------------------------------------------------------*
+*& AT SELECTION SCREEN Actions(PAI)
+*&---------------------------------------------------------------------*
+AT SELECTION-SCREEN.
+  lcl_sel_screen=>get_instance( )->screen_pai( sscrfields-ucomm ).
 
 *&---------------------------------------------------------------------*
 *& EXECUTABLE CODE
@@ -124,70 +171,93 @@ START-OF-SELECTION.
 
 END-OF-SELECTION.
 
-*&---------------------------------------------------------------------*
-*& Form SCREEN INITIALIZATION
-*&---------------------------------------------------------------------*
-FORM screen_initialization.
+*----------------------------------------------------------------------*
+* CLASS lcl_sel_screen IMPLEMENTATION
+*----------------------------------------------------------------------*
+CLASS lcl_sel_screen IMPLEMENTATION.
 
-  title0                   = 'Export Filepath'.
-  title1                   = 'Texts Selection'.
-  title2                   = 'Properties'.
+  METHOD 	get_instance.
 
-  syst-title               = 'Texts Export'.
-  %_p_file_%_app_%-text    = icon_xls         && 'Excel Filepath'.
-  %_s_obj_%_app_%-text     = icon_object_list && 'Text Object'.
-  %_s_tdname_%_app_%-text  = icon_text_field  && 'Text Name'.
-  %_s_tdid_%_app_%-text    = icon_text_ina    && 'Text ID'.
-  %_s_spras_%_app_%-text   = icon_eu          && 'Language'.
-  %_c_header_%_app_%-text  = 'Field Labels as Excel Header'.
+    IF lo_instance IS NOT BOUND.
+      lo_instance = NEW #( ).
+    ENDIF.
 
-ENDFORM.
-
-FORM get_export_filepath CHANGING lp_file.
-
-  DATA: filename    TYPE string,
-        path        TYPE string,
-        fullpath    TYPE string,
-        user_action TYPE i.
-
-  cl_gui_frontend_services=>file_save_dialog(
-          EXPORTING
-            window_title              = 'File System of Presentation Server'
-            default_extension         = cl_gui_frontend_services=>filetype_excel
-            prompt_on_overwrite       = abap_true
-            default_file_name         = 'Exported_Texts.XLSX'
-            file_filter               = 'All Files(*.*)|*.*|' && 'Excel Files (*.xlsx)|*.xlsx|' &&'Excel Files (*.xls)|*.xls|'
-          CHANGING
-            filename                  = filename
-            path                      = path
-            fullpath                  = fullpath
-            user_action               = user_action
-          EXCEPTIONS
-            cntl_error                = 1
-            error_no_gui              = 2
-            not_supported_by_gui      = 3
-            invalid_default_file_name = 4
-            OTHERS                    = 5 ).
-
-  lp_file = COND #( WHEN syst-subrc IS INITIAL AND user_action EQ cl_gui_frontend_services=>action_ok THEN fullpath ).
-
-ENDFORM.
-
-*&---------------------------------------------------------------------*
-*& Class LCX_TEXTS IMPLEMENTATION
-*&---------------------------------------------------------------------*
-CLASS lcx_texts IMPLEMENTATION.
-
-  METHOD constructor.
-
-    super->constructor( textid = CONV #( text ) ).
-    local_text = text.
+    re_instance = lo_instance.
 
   ENDMETHOD.
 
-  METHOD get_text.
+  METHOD screen_initialization.
 
-    result = me->local_text.
+    title0                   = 'Export Filepath'.
+    title1                   = 'Texts Selection'.
+    title2                   = 'Properties'.
+
+    syst-title               = 'Texts Export'.
+    %_p_file_%_app_%-text    = icon_xls         && 'Excel Filepath'.
+    %_s_obj_%_app_%-text     = icon_object_list && 'Text Object'.
+    %_s_tdname_%_app_%-text  = icon_text_field  && 'Text Name'.
+    %_s_tdid_%_app_%-text    = icon_text_ina    && 'Text ID'.
+    %_s_spras_%_app_%-text   = icon_eu          && 'Language'.
+    %_c_header_%_app_%-text  = 'Field Labels as Excel Header'.
+
+  ENDMETHOD.
+
+  METHOD screen_pbo.
+
+    LOOP AT SCREEN INTO DATA(ls_screen).
+
+      MODIFY SCREEN FROM ls_screen.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD screen_pai.
+
+    CASE im_system_command.
+
+      WHEN /pmg/if_ge_sel_constants=>gc_policy_free_sel.
+
+      WHEN cl_wsti_calc_const=>c_execute.
+
+    ENDCASE.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+*&---------------------------------------------------------------------*
+*& Class LCL_UTILITIES IMPLEMENTATION
+*&---------------------------------------------------------------------*
+CLASS lcl_utilities IMPLEMENTATION.
+
+  METHOD get_export_filepath.
+
+    DATA filename    TYPE string.
+    DATA path        TYPE string.
+    DATA fullpath    TYPE string.
+    DATA user_action TYPE i.
+
+    cl_gui_frontend_services=>file_save_dialog(
+            EXPORTING
+              window_title              = 'File System of Presentation Server'
+              default_extension         = cl_gui_frontend_services=>filetype_excel
+              prompt_on_overwrite       = abap_true
+              default_file_name         = 'Exported_Texts.XLSX'
+              file_filter               = 'All Files(*.*)|*.*|' && 'Excel Files (*.xlsx)|*.xlsx|' &&'Excel Files (*.xls)|*.xls|'
+            CHANGING
+              filename                  = filename
+              path                      = path
+              fullpath                  = fullpath
+              user_action               = user_action
+            EXCEPTIONS
+              cntl_error                = 1
+              error_no_gui              = 2
+              not_supported_by_gui      = 3
+              invalid_default_file_name = 4
+              OTHERS                    = 5 ).
+
+    ch_filepath = COND #( WHEN syst-subrc IS INITIAL AND user_action EQ cl_gui_frontend_services=>action_ok THEN fullpath ).
 
   ENDMETHOD.
 
@@ -200,7 +270,7 @@ CLASS lcl_texts IMPLEMENTATION.
 
   METHOD get_data.
 
-    CLEAR:me->lt_texts.
+    CLEAR me->lt_texts.
     SELECT FROM stxh
       FIELDS stxh~tdobject, stxh~tdname, stxh~tdid, stxh~tdspras, stxh~tdtxtlines
       WHERE tdobject IN  @so_object
@@ -219,11 +289,11 @@ CLASS lcl_texts IMPLEMENTATION.
 
   METHOD populate_texts.
 
-    DATA:lt_lines TYPE TABLE OF  tline.
+    DATA lt_lines TYPE TABLE OF  tline.
 
     LOOP AT me->lt_texts ASSIGNING FIELD-SYMBOL(<fs_line>).
 
-      CLEAR:lt_lines.
+      CLEAR lt_lines.
       CALL FUNCTION 'READ_TEXT'
         EXPORTING
           client                  = syst-mandt
@@ -270,7 +340,7 @@ CLASS lcl_texts IMPLEMENTATION.
         EXIT.
     ENDTRY.
 
-    IF im_field_labels_as_header EQ abap_true."BUILD EXCEL HEADER LINE
+    IF im_field_labels_as_header EQ abap_true.
 
       LOOP AT lt_fieldcatalog ASSIGNING FIELD-SYMBOL(<fs_line>).
         <fs_line>-fix_column = abap_true.
@@ -284,8 +354,8 @@ CLASS lcl_texts IMPLEMENTATION.
     "Get XSTRING
     cl_salv_bs_tt_util=>if_salv_bs_tt_util~transform( EXPORTING xml_type      = if_salv_bs_xml=>c_type_xlsx
                                                                 xml_version   = cl_salv_bs_a_xml_base=>get_version( )
-                                                                r_result_data = cl_salv_ex_util=>factory_result_data_table( r_data        = REF #( me->lt_texts )
-                                                                                                                           t_fieldcatalog = lt_fieldcatalog )
+                                                                r_result_data = cl_salv_ex_util=>factory_result_data_table( r_data         = REF #( me->lt_texts )
+                                                                                                                            t_fieldcatalog = lt_fieldcatalog )
                                                                 xml_flavour   = if_salv_bs_c_tt=>c_tt_xml_flavour_export
                                                                 gui_type      = if_salv_bs_xml=>c_gui_type_gui
                                                       IMPORTING xml           = DATA(lv_xstring) ).
@@ -338,6 +408,26 @@ CLASS lcl_texts IMPLEMENTATION.
     IF syst-subrc IS NOT INITIAL.
       RAISE EXCEPTION TYPE lcx_texts EXPORTING text = 'Error Downloading Texts'.
     ENDIF.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+*&---------------------------------------------------------------------*
+*& Class LCX_TEXTS IMPLEMENTATION
+*&---------------------------------------------------------------------*
+CLASS lcx_texts IMPLEMENTATION.
+
+  METHOD constructor.
+
+    super->constructor( textid = CONV #( text ) ).
+    local_text = text.
+
+  ENDMETHOD.
+
+  METHOD get_text.
+
+    result = me->local_text.
 
   ENDMETHOD.
 
