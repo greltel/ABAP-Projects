@@ -1,8 +1,8 @@
 ************************************************************************
 *   Program name: Z_DYNAMIC_TEXTS_EXPORT
-*   Description :
+*   Description : Download Texts to XLSX File
 *
-*   Created   by: GDRAKOS
+*   Created   by: George Drakos
 *
 ************************************************************************
 REPORT z_dynamic_texts_export.
