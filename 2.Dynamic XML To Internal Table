@@ -2,7 +2,7 @@
 *   Program name: Dynamic XML to Table Convertion
 *   Description : Render any XML File to Table
 *
-*   Created   by: GDRAKOS
+*   Created   by: George Drakos
 *
 ************************************************************************
 REPORT z_xml_to_internal_table.
