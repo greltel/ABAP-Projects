@@ -7,8 +7,14 @@
 ************************************************************************
 REPORT z_xml_to_internal_table.
 
-CLASS: lcx_xml DEFINITION DEFERRED,
-       lcl_xml DEFINITION DEFERRED.
+*&---------------------------------------------------------------------*
+*& GLOBAL DATA DEFINITION
+*&---------------------------------------------------------------------*
+TABLES:sscrfields.
+
+CLASS: lcx_xml        DEFINITION DEFERRED,
+       lcl_xml        DEFINITION DEFERRED,
+       lcl_sel_screen DEFINITION DEFERRED.
 
 *&----------------------------------------------------------------------*
 *& CLASS LCX_XML DEFINITION
@@ -24,6 +30,26 @@ CLASS lcx_xml DEFINITION INHERITING FROM cx_static_check.
   PRIVATE SECTION.
 
     DATA: local_text TYPE string.
+
+ENDCLASS.
+
+*----------------------------------------------------------------------*
+* CLASS lcl_sel_screen DEFINITION
+*----------------------------------------------------------------------*
+CLASS lcl_sel_screen DEFINITION FINAL CREATE PRIVATE.
+
+  PUBLIC SECTION.
+
+    CLASS-METHODS get_instance RETURNING VALUE(re_instance) TYPE REF TO lcl_sel_screen.
+
+    METHODS:
+      screen_initialization,
+      screen_pbo,
+      screen_pai IMPORTING im_system_command TYPE syst-ucomm.
+
+  PRIVATE SECTION.
+
+    CLASS-DATA lo_instance TYPE REF TO lcl_sel_screen.
 
 ENDCLASS.
 
@@ -99,7 +125,7 @@ SELECTION-SCREEN END OF BLOCK b1.
 *& INITIALIZATION OF SELECTION SCREEN ELEMENTS
 *&---------------------------------------------------------------------*
 INITIALIZATION.
-  PERFORM screen_initialization.
+  lcl_sel_screen=>get_instance( )->screen_initialization( ).
 
 *&---------------------------------------------------------------------*
 *& AT SELECTION SCREEN ON VALUE REQUESTS (F4)
@@ -111,7 +137,7 @@ AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
 *& AT SELECTION SCREEN Actions(PAI)
 *&---------------------------------------------------------------------*
 AT SELECTION-SCREEN.
-  PERFORM screen_pai.
+  lcl_sel_screen=>get_instance( )->screen_pai( sscrfields-ucomm ).
 
 *&---------------------------------------------------------------------*
 *& EXECUTABLE CODE
@@ -121,7 +147,7 @@ START-OF-SELECTION.
   TRY.
 
       NEW lcl_xml( p_file )->get_structured_table_from_xml( EXPORTING im_attribute_node = p_attr
-                                                            IMPORTING ex_table = DATA(lr_table) ).
+                                                            IMPORTING ex_table          = DATA(lr_table) ).
 
       lcl_xml=>display_table( lr_table ).
 
@@ -131,30 +157,51 @@ START-OF-SELECTION.
 
 END-OF-SELECTION.
 
-*&---------------------------------------------------------------------*
-*& Form SCREEN INITIALIZATION
-*&---------------------------------------------------------------------*
-FORM screen_initialization.
+*----------------------------------------------------------------------*
+* CLASS lcl_sel_screen IMPLEMENTATION
+*----------------------------------------------------------------------*
+CLASS lcl_sel_screen IMPLEMENTATION.
 
-  title1                = 'XML Selection Criteria'.
-  %_p_file_%_app_%-text = icon_xml_doc      && 'XML Filepath'.
-  %_p_attr_%_app_%-text = icon_io_attribute && 'Attribute Node'.
+  METHOD 	get_instance.
 
-ENDFORM.
+    IF lo_instance IS NOT BOUND.
+      lo_instance = NEW #( ).
+    ENDIF.
 
-*&---------------------------------------------------------------------*
-*& Form SCREEN PROCESS AFTER INPUT
-*&---------------------------------------------------------------------*
-FORM screen_pai.
+    re_instance = lo_instance.
 
-  CASE syst-ucomm.
-    WHEN 'ONLI'.
-      IF p_file IS INITIAL.
-        MESSAGE 'Filepath is Mandatory Field' TYPE cl_cms_common=>con_msg_typ_e.
-      ENDIF.
-  ENDCASE.
+  ENDMETHOD.
 
-ENDFORM.
+  METHOD screen_initialization.
+
+    title1                = 'XML Selection Criteria'.
+    %_p_file_%_app_%-text = icon_xml_doc      && 'XML Filepath'.
+    %_p_attr_%_app_%-text = icon_io_attribute && 'Attribute Node'.
+
+  ENDMETHOD.
+
+  METHOD screen_pbo.
+
+    LOOP AT SCREEN INTO DATA(ls_screen).
+
+      MODIFY SCREEN FROM ls_screen.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD screen_pai.
+
+    CASE im_system_command.
+      WHEN cl_wsti_calc_const=>c_execute.
+        IF p_file IS INITIAL.
+          MESSAGE 'Filepath is Mandatory Field' TYPE cl_cms_common=>con_msg_typ_e.
+        ENDIF.
+    ENDCASE.
+
+  ENDMETHOD.
+
+ENDCLASS.
 
 *&---------------------------------------------------------------------*
 *& Class LCL_XML Implementation
@@ -163,8 +210,8 @@ CLASS lcl_xml IMPLEMENTATION.
 
   METHOD open_dialog_xml.
 
-    DATA: lt_file_table TYPE filetable,
-          lv_return     TYPE i.
+    DATA lt_file_table TYPE filetable.
+    DATA lv_return     TYPE i.
 
     cl_gui_frontend_services=>file_open_dialog(
       EXPORTING
@@ -222,7 +269,7 @@ CLASS lcl_xml IMPLEMENTATION.
 
   METHOD read_xml_to_table.
 
-    DATA: lt_return TYPE TABLE OF bapiret2.
+    DATA lt_return TYPE bapiret2_t.
 
     CALL FUNCTION 'SMUM_XML_PARSE'
       EXPORTING
@@ -260,8 +307,8 @@ CLASS lcl_xml IMPLEMENTATION.
 
   METHOD get_dynamic_table_from_xml.
 
-    DATA: lv_line_counter TYPE syst-tabix,
-          lt_components   TYPE  cl_abap_structdescr=>component_table.
+    DATA lv_line_counter TYPE syst-tabix.
+    DATA lt_components   TYPE  cl_abap_structdescr=>component_table.
 
     LOOP AT me->lt_xml ASSIGNING FIELD-SYMBOL(<fs_xml_line>).
 
@@ -326,8 +373,8 @@ CLASS lcl_xml IMPLEMENTATION.
 
   METHOD populate_table_from_xml.
 
-    DATA: lr_data_reference TYPE REF TO data,
-          lv_line_counter   TYPE i.
+    DATA lr_data_reference TYPE REF TO data.
+    DATA lv_line_counter   TYPE i.
 
     FIELD-SYMBOLS: <fs_line>  TYPE any,
                    <fs_value> TYPE any.
@@ -435,9 +482,10 @@ CLASS lcl_xml IMPLEMENTATION.
     CHECK <fs_itab> IS ASSIGNED.
 
     TRY.
-        cl_salv_table=>factory( EXPORTING r_container = cl_gui_container=>default_screen list_display = if_salv_c_bool_sap=>false
+        cl_salv_table=>factory( EXPORTING r_container  = cl_gui_container=>default_screen
+                                          list_display = if_salv_c_bool_sap=>false
                                 IMPORTING r_salv_table = DATA(lo_alv)
-                                CHANGING  t_table = <fs_itab> ).
+                                CHANGING  t_table      = <fs_itab> ).
       CATCH cx_salv_msg INTO DATA(lo_exception).
         RAISE EXCEPTION TYPE lcx_xml EXPORTING text = lo_exception->get_text( ).
     ENDTRY.
@@ -460,7 +508,7 @@ CLASS lcl_xml IMPLEMENTATION.
                       )->set_default( abap_true ),
                       )->set_save_restriction( if_salv_c_layout=>restrict_none ).
 
-    SET HANDLER: lcl_xml=>on_user_command FOR lo_alv->get_event( ) ACTIVATION abap_true.
+    SET HANDLER lcl_xml=>on_user_command FOR lo_alv->get_event( ) ACTIVATION abap_true.
 
     TRY.
         lo_alv->get_functions(:
