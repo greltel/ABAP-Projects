@@ -239,23 +239,23 @@ CLASS lcl_utilities IMPLEMENTATION.
     DATA user_action TYPE i.
 
     cl_gui_frontend_services=>file_save_dialog(
-            EXPORTING
-              window_title              = 'File System of Presentation Server'
-              default_extension         = cl_gui_frontend_services=>filetype_excel
-              prompt_on_overwrite       = abap_true
-              default_file_name         = 'Exported_Texts.XLSX'
-              file_filter               = 'All Files(*.*)|*.*|' && 'Excel Files (*.xlsx)|*.xlsx|' &&'Excel Files (*.xls)|*.xls|'
-            CHANGING
-              filename                  = filename
-              path                      = path
-              fullpath                  = fullpath
-              user_action               = user_action
-            EXCEPTIONS
-              cntl_error                = 1
-              error_no_gui              = 2
-              not_supported_by_gui      = 3
-              invalid_default_file_name = 4
-              OTHERS                    = 5 ).
+      EXPORTING
+        window_title              = 'File System of Presentation Server'
+        default_extension         = cl_gui_frontend_services=>filetype_excel
+        prompt_on_overwrite       = abap_true
+        default_file_name         = 'Exported_Texts.XLSX'
+        file_filter               = 'All Files(*.*)|*.*|' && 'Excel Files (*.xlsx)|*.xlsx|' && 'Excel Files (*.xls)|*.xls|'
+      CHANGING
+        filename                  = filename
+        path                      = path
+        fullpath                  = fullpath
+        user_action               = user_action
+      EXCEPTIONS
+        cntl_error                = 1
+        error_no_gui              = 2
+        not_supported_by_gui      = 3
+        invalid_default_file_name = 4
+        OTHERS                    = 5 ).
 
     ch_filepath = COND #( WHEN syst-subrc IS INITIAL AND user_action EQ cl_gui_frontend_services=>action_ok THEN fullpath ).
 
@@ -289,36 +289,33 @@ CLASS lcl_texts IMPLEMENTATION.
 
   METHOD populate_texts.
 
-    DATA lt_lines TYPE TABLE OF  tline.
+    DATA lt_text_table TYPE  text_lh.
+    DATA lt_error_table TYPE  text_lh.
 
     LOOP AT me->lt_texts ASSIGNING FIELD-SYMBOL(<fs_line>).
 
-      CLEAR lt_lines.
-      CALL FUNCTION 'READ_TEXT'
+      CALL FUNCTION 'READ_MULTIPLE_TEXTS'
         EXPORTING
           client                  = syst-mandt
-          id                      = <fs_line>-tdid
-          language                = <fs_line>-tdspras
           name                    = <fs_line>-tdname
           object                  = <fs_line>-tdobject
-        TABLES
-          lines                   = lt_lines
+          id                      = <fs_line>-tdid
+          language                = <fs_line>-tdspras
+        IMPORTING
+          text_table              = lt_text_table
+          error_table             = lt_error_table
         EXCEPTIONS
-          id                      = 1
-          language                = 2
-          name                    = 3
-          not_found               = 4
-          object                  = 5
-          reference_check         = 6
-          wrong_access_to_archive = 7
-          error_message           = 8
-          OTHERS                  = 9.
+          wrong_access_to_archive = 1
+          error_message           = 2
+          OTHERS                  = 3.
 
-      IF syst-subrc IS INITIAL AND lt_lines IS NOT INITIAL.
+      IF syst-subrc IS INITIAL AND lt_text_table IS NOT INITIAL.
+
+        DATA(lt_text) = VALUE #( lt_text_table[ 1 ]-lines OPTIONAL ).
 
         CALL FUNCTION 'IDMX_DI_TLINE_INTO_STRING'
           EXPORTING
-            it_tline       = lt_lines
+            it_tline       = lt_text
           IMPORTING
             ev_text_string = <fs_line>-text
           EXCEPTIONS
@@ -327,6 +324,8 @@ CLASS lcl_texts IMPLEMENTATION.
 
       ENDIF.
 
+      CLEAR:lt_text,lt_text_table,lt_error_table.
+
     ENDLOOP.
 
   ENDMETHOD.
@@ -334,7 +333,7 @@ CLASS lcl_texts IMPLEMENTATION.
   METHOD download_texts.
 
     TRY.
-        cl_salv_table=>factory( IMPORTING r_salv_table   = DATA(lo_salv) CHANGING t_table = me->lt_texts ).
+        cl_salv_table=>factory( IMPORTING r_salv_table = DATA(lo_salv) CHANGING t_table = me->lt_texts ).
         DATA(lt_fieldcatalog) = cl_salv_controller_metadata=>get_lvc_fieldcatalog( r_columns = lo_salv->get_columns( ) r_aggregations = lo_salv->get_aggregations( ) ).
       CATCH cx_salv_msg INTO DATA(lo_exception).
         EXIT.
@@ -370,40 +369,40 @@ CLASS lcl_texts IMPLEMENTATION.
     CHECK lt_binary_content IS NOT INITIAL.
 
     cl_gui_frontend_services=>gui_download(
-          EXPORTING
-            bin_filesize              = lv_bin_size
-            filename                  = |{ im_filename }|
-            filetype                  = 'BIN'
-            confirm_overwrite         = abap_true
-          IMPORTING
-            filelength                = DATA(lv_bytestransferred)
-          CHANGING
-            data_tab                  = lt_binary_content
-          EXCEPTIONS
-            file_write_error          = 1
-            no_batch                  = 2
-            gui_refuse_filetransfer   = 3
-            invalid_type              = 4
-            no_authority              = 5
-            unknown_error             = 6
-            header_not_allowed        = 7
-            separator_not_allowed     = 8
-            filesize_not_allowed      = 9
-            header_too_long           = 10
-            dp_error_create           = 11
-            dp_error_send             = 12
-            dp_error_write            = 13
-            unknown_dp_error          = 14
-            access_denied             = 15
-            dp_out_of_memory          = 16
-            disk_full                 = 17
-            dp_timeout                = 18
-            file_not_found            = 19
-            dataprovider_exception    = 20
-            control_flush_error       = 21
-            not_supported_by_gui      = 22
-            error_no_gui              = 23
-            OTHERS                    = 24 ).
+      EXPORTING
+        bin_filesize            = lv_bin_size
+        filename                = |{ im_filename }|
+        filetype                = 'BIN'
+        confirm_overwrite       = abap_true
+      IMPORTING
+        filelength              = DATA(lv_bytestransferred)
+      CHANGING
+        data_tab                = lt_binary_content
+      EXCEPTIONS
+        file_write_error        = 1
+        no_batch                = 2
+        gui_refuse_filetransfer = 3
+        invalid_type            = 4
+        no_authority            = 5
+        unknown_error           = 6
+        header_not_allowed      = 7
+        separator_not_allowed   = 8
+        filesize_not_allowed    = 9
+        header_too_long         = 10
+        dp_error_create         = 11
+        dp_error_send           = 12
+        dp_error_write          = 13
+        unknown_dp_error        = 14
+        access_denied           = 15
+        dp_out_of_memory        = 16
+        disk_full               = 17
+        dp_timeout              = 18
+        file_not_found          = 19
+        dataprovider_exception  = 20
+        control_flush_error     = 21
+        not_supported_by_gui    = 22
+        error_no_gui            = 23
+        OTHERS                  = 24 ).
 
     IF syst-subrc IS NOT INITIAL.
       RAISE EXCEPTION TYPE lcx_texts EXPORTING text = 'Error Downloading Texts'.
