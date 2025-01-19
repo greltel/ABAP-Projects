@@ -1,8 +1,8 @@
 ************************************************************************
 *   Program name: ZCOUNT_SINGLE_MULTIPLE_VALUES
-*   Description :
+*   Description : Count Single and Multiple Values of Internal Table
 *
-*   Created   by: GDRAKOS
+*   Created   by: George Drakos
 *
 ************************************************************************
 REPORT zcount_single_multiple_values.
