@@ -2,7 +2,7 @@
 *   Program name: Z_SALV_ALV
 *   Description : Dynamic SALV Console
 *
-*   Created   by: GDRAKOS
+*   Created   by: George Drakos
 *
 ************************************************************************
 REPORT z_salv_alv NO STANDARD PAGE HEADING LINE-COUNT 255.
